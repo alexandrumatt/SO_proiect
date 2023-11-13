@@ -1,178 +1,187 @@
-#include <stdio.h>
+#include <unistd.h>
 #include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h> 
-#include <unistd.h> 
+#include <time.h>
 
+#define BMP_HEADER_SIZE 54
 
-
-int main ( int argc, char **argv )
-{
-    /* verificare argumente*/
-    if (argc!= 2){
-        
-        printf("Usage ./program <fisier_intrare>");
-        exit(1);
-    }
-
-
-    /*deschidere fisier*/
-    int fd = open(argv[1], O_RDONLY);
-
-     if (fd == -1) { 
-        printf("Fisierul de tip imagine nu a fost deschis."); 
-  
-        // print program detail "Success or failure" 
-        perror("erare");
-        close(fd);
-        exit(1);
-    } 
-
-
-
-    printf("Nr arg:");
-    printf("fd = %d\n", fd); 
-
-
-    char sir1[500];
-       
-    printf("opened the fd = %d\n", fd1); 
-
-    sprintf(sir1, "nume fisier: %d\n", mari); 
-        
-    
- 
-
-    int long sz;  
-    
-    /*scriere fisier iesire*/
-    int fd2 = open("statistica.txt", O_WRONLY | O_CREAT | O_TRUNC, 0644);  
-        if (fd2 < 0) {  
-            perror("eroare");  
-            exit(1);  
-        }  
-            
-    
-    write(fd2, sir1, strlen(sir1)); 
-      
-    /*inchidere fisiere*/
-    close(fd);
-    close(fd2);  
-
-
+void display_usage() {
+    write(STDERR_FILENO, "Usage: ./program <director_intrare>\n", 37);
+    exit(EXIT_FAILURE);
 }
 
-
-/*
-
-    int fd = open("intrare.txt", O_RDONLY | O_CREAT); 
-  
-
-    printf("Nr arg:");
-    printf("fd = %d\n", fd); 
-  
-    if (fd == -1) { 
-        // print which type of error have in a code 
-        printf("Error Number % d\n", errno); 
-  
-        // print program detail "Success or failure" 
-        perror("Program"); 
-    } 
-
-    if(fd == 3) {
-        int fd1 = open("intrare.txt", O_RDONLY); 
-        if (fd1 < 0) { 
-            perror("c1"); 
-            exit(1); 
-        } 
-
-
-       struct stat fileStat;
-        if (fstat(fd1, &fileStat)==-1)
-        {
-            perror("erare");
-            close(fd1);
-            exit(1);
-        }
-
-        char x;
-        char sir1[80];
-        char sir2[80];
-        char sir3[80];
-        char sir4[80];
-        char sir5[80];
-        x=argv[3];
-        printf("Caracterul %c", x);
-        char c; 
-        int mari = 0; 
-        int mici = 0;
-        int cifre = 0;
-        int ap=0;
-        printf("opened the fd = %d\n", fd1); 
-
-        int e = read(fd1, &c, 1); 
-        while(e>0){
-            printf("c = %c\n", c); 
-            if(c >= 'A' && c <= 'Z')
-                mari ++;
-            if(c >= 'a' && c <= 'z')
-                mici ++;
-            if('0' <= c && c <= '9')
-                cifre ++;
-            if(c==argv[3][0])
-                ap++;
-            e = read(fd1, &c, 1); 
-
-        }
-
-        printf("mari = %d\n", mari); 
-        printf("mici = %d\n", mici); 
-        printf("cifre = %d\n", cifre);
-        printf("aparitii = %d\n", ap);
-        printf("dimens fisier = %d\n", fileStat.st_size);
-
-        sprintf(sir1, "mari = %d\n", mari); 
-        sprintf(sir2, "mari = %d\n", mici); 
-        sprintf(sir3, "cifre = %d\n", cifre); 
-        sprintf(sir4, "aparitii = %d\n", ap); 
-        sprintf(sir5, "dimens fisier = %d\n", fileStat.st_size); 
-
-        int long sz;  
-            
-        int fd2 = open("iesire.txt", O_WRONLY | O_CREAT | O_TRUNC, 0644);  
-        if (fd2 < 0) {  
-            perror("r1");  
-            exit(1);  
-        }  
-            
-        write(fd2, sir1, strlen(sir1)); 
-        write(fd2, sir2, strlen(sir2));   
-        write(fd2, sir3, strlen(sir3));  
-        write(fd2, sir4, strlen(sir4)); 
-        write(fd2, sir5, strlen(sir5));
-      
-
-
-        close(fd2);  
-
-
-
-        
-
-
-        // Using close system Call 
-        if (close(fd1) < 0) { 
-            perror("c1"); 
-            exit(1); 
-        } 
-        printf("closed the fd.\n"); 
+void write_file_info(const char *filename, struct stat *file_stat) {
+    int fd_stat = open("statistica.txt", O_WRONLY | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR);
+    if (fd_stat == -1) {
+        perror("Error opening statistica.txt");
+        exit(EXIT_FAILURE);
     }
 
-    return 0; 
+    char buffer[256];
 
+    // Nume fisier sau director
+    sprintf(buffer, "nume: %s\n", filename);
+    write(fd_stat, buffer, strlen(buffer));
+
+    // Dimensiune (doar pentru fisiere)
+    if (S_ISREG(file_stat->st_mode)) {
+        sprintf(buffer, "dimensiune: %ld\n", (long)file_stat->st_size);
+        write(fd_stat, buffer, strlen(buffer));
+    }
+
+    // Identificator utilizator
+    sprintf(buffer, "identificatorul utilizatorului: %d\n", file_stat->st_uid);
+    write(fd_stat, buffer, strlen(buffer));
+
+    // Timpul ultimei modificari
+    struct tm *tm_info = localtime(&file_stat->st_mtime);
+    strftime(buffer, sizeof(buffer), "timpul ultimei modificari: %d.%m.%Y\n", tm_info);
+    write(fd_stat, buffer, strlen(buffer));
+
+    // Contor de legaturi
+    sprintf(buffer, "contorul de legaturi: %ld\n", (long)file_stat->st_nlink);
+    write(fd_stat, buffer, strlen(buffer));
+
+    // Drepturi de acces
+    sprintf(buffer, "drepturi de acces user: %c%c%c\n",
+            (file_stat->st_mode & S_IRUSR) ? 'R' : '-',
+            (file_stat->st_mode & S_IWUSR) ? 'W' : '-',
+            (file_stat->st_mode & S_IXUSR) ? 'X' : '-');
+    write(fd_stat, buffer, strlen(buffer));
+
+    sprintf(buffer, "drepturi de acces grup: %c%c%c\n",
+            (file_stat->st_mode & S_IRGRP) ? 'R' : '-',
+            (file_stat->st_mode & S_IWGRP) ? 'W' : '-',
+            (file_stat->st_mode & S_IXGRP) ? 'X' : '-');
+    write(fd_stat, buffer, strlen(buffer));
+
+    sprintf(buffer, "drepturi de acces altii: %c%c%c\n",
+            (file_stat->st_mode & S_IROTH) ? 'R' : '-',
+            (file_stat->st_mode & S_IWOTH) ? 'W' : '-',
+            (file_stat->st_mode & S_IXOTH) ? 'X' : '-');
+    write(fd_stat, buffer, strlen(buffer));
+
+    close(fd_stat);
 }
 
-*/
+void process_directory(const char *dir_path) {
+    DIR *dir = opendir(dir_path);
+    if (!dir) {
+        perror("Error opening directory");
+        exit(EXIT_FAILURE);
+    }
 
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (entry->d_name[0] == '.') {
+            continue;  // Ignora intrarile "." si ".."
+        }
 
+        char entry_path[PATH_MAX];
+        snprintf(entry_path, sizeof(entry_path), "%s/%s", dir_path, entry->d_name);
+
+        struct stat file_stat;
+        if (lstat(entry_path, &file_stat) == -1) {
+            perror("Error getting file information");
+            exit(EXIT_FAILURE);
+        }
+
+        if (S_ISREG(file_stat.st_mode) && strstr(entry->d_name, ".bmp")) {
+            write_file_info(entry->d_name, &file_stat);
+        } else if (S_ISREG(file_stat.st_mode)) {
+            write_file_info(entry->d_name, &file_stat);
+        } else if (S_ISDIR(file_stat.st_mode)) {
+            int fd_stat = open("statistica.txt", O_WRONLY | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR);
+            if (fd_stat == -1) {
+                perror("Error opening statistica.txt");
+                exit(EXIT_FAILURE);
+            }
+
+            char buffer[256];
+
+            // Nume director
+            sprintf(buffer, "nume director: %s\n", entry->d_name);
+            write(fd_stat, buffer, strlen(buffer));
+
+            // Identificator utilizator
+            sprintf(buffer, "identificatorul utilizatorului: %d\n", file_stat.st_uid);
+            write(fd_stat, buffer, strlen(buffer));
+
+            // Drepturi de acces
+            sprintf(buffer, "drepturi de acces user: RWX\n");
+            write(fd_stat, buffer, strlen(buffer));
+
+            sprintf(buffer, "drepturi de acces grup: R--\n");
+            write(fd_stat, buffer, strlen(buffer));
+
+            sprintf(buffer, "drepturi de acces altii: ---\n");
+            write(fd_stat, buffer, strlen(buffer));
+
+            close(fd_stat);
+        } else if (S_ISLNK(file_stat.st_mode)) {
+            char target_path[PATH_MAX];
+            ssize_t target_len = readlink(entry_path, target_path, sizeof(target_path) - 1);
+            if (target_len == -1) {
+                perror("Error reading symbolic link");
+                exit(EXIT_FAILURE);
+            }
+            target_path[target_len] = '\0';
+
+            int fd_stat = open("statistica.txt", O_WRONLY | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR);
+            if (fd_stat == -1) {
+                perror("Error opening statistica.txt");
+                exit(EXIT_FAILURE);
+            }
+
+            char buffer[256];
+
+            // Nume legatura
+            sprintf(buffer, "nume legatura: %s\n", entry->d_name);
+            write(fd_stat, buffer, strlen(buffer));
+
+            // Dimensiune legatura
+            sprintf(buffer, "dimensiune: %ld\n", (long)target_len);
+            write(fd_stat, buffer, strlen(buffer));
+
+            // Dimensiune fisier target
+            struct stat target_stat;
+            if (lstat(target_path, &target_stat) == -1) {
+                perror("Error getting target file information");
+                exit(EXIT_FAILURE);
+            }
+            sprintf(buffer, "dimensiune fisier: %ld\n", (long)target_stat.st_size);
+            write(fd_stat, buffer, strlen(buffer));
+
+            // Drepturi de acces
+            sprintf(buffer, "drepturi de acces user: RWX\n");
+            write(fd_stat, buffer, strlen(buffer));
+
+            sprintf(buffer, "drepturi de acces grup: R--\n");
+            write(fd_stat, buffer, strlen(buffer));
+
+            sprintf(buffer, "drepturi de acces altii: ---\n");
+            write(fd_stat, buffer, strlen(buffer));
+
+            close(fd_stat);
+        }
+    }
+
+    closedir(dir);
+}
+
+int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        display_usage();
+    }
+
+    const char *dir_path = argv[1];
+
+    process_directory(dir_path);
+
+    return 0;
+}
