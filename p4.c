@@ -18,6 +18,7 @@ void display_usage() {
 
 void write_file_info(const char *filename, struct stat *file_stat, const char *output_path) {
     int fd_stat = open(output_path, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    printf(fd_stat, "\n");
     if (fd_stat == -1) {
         perror("Error 1 opening output file");
         exit(EXIT_FAILURE);
@@ -46,6 +47,7 @@ void convert_to_grayscale(const char *input_path, const char *output_path) {
     }
 
     int output_fd = open(output_path, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    printf(output_fd, "\n");
     if (output_fd == -1) {
         perror("Error 3 opening output file");
         close(input_fd);
